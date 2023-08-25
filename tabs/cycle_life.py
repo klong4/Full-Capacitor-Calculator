@@ -1,8 +1,8 @@
 from PyQt5 import QtWidgets
+from PyQt5.QtWidgets import QProgressBar
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-
 import numpy as np
 
 class CycleLifeTab(QtWidgets.QWidget):
@@ -40,6 +40,8 @@ class CycleLifeTab(QtWidgets.QWidget):
         inputsLayout.addLayout(layout)
         layout, self.VxInput, _ = create_input_field("Working Voltage (Vx):", "Working Voltage (Vx): The voltage applied to the capacitor in the application.", ["V"])
         inputsLayout.addLayout(layout)
+        layout, self.IInput, _ = create_input_field("Discharge Current (I):", "Discharge Current (I): The current at which the capacitor is discharged.", ["A"])
+        inputsLayout.addLayout(layout)
 
         # Capacitor Technology Dropdown
         self.capacitorTechDropdown = QtWidgets.QComboBox()
@@ -50,7 +52,8 @@ class CycleLifeTab(QtWidgets.QWidget):
 
         # Graph Type Dropdown
         self.graphTypeDropdown = QtWidgets.QComboBox()
-        self.graphTypeDropdown.addItems(["Voltage/Cycles", "Arrhenius Plot (Leakage Current/Temp)", "Log/Log Plot (Capacitance/Resistance over Time)"])
+        #self.graphTypeDropdown.addItems(["Voltage/Cycles", "Arrhenius Plot (Leakage Current/Temp)", "Log/Log Plot (Capacitance/Resistance over Time)"])
+        self.graphTypeDropdown.addItems(["Voltage/Cycles", "Log/Log Plot (Capacitance/Resistance over Time)"])
         inputsLayout.addWidget(QtWidgets.QLabel("Graph Type:"))
         inputsLayout.addWidget(self.graphTypeDropdown)
 
@@ -58,6 +61,10 @@ class CycleLifeTab(QtWidgets.QWidget):
         calculateButton = QtWidgets.QPushButton("Calculate")
         calculateButton.clicked.connect(self.calculate)
         inputsLayout.addWidget(calculateButton)
+        
+        # Add Progress Bar
+        self.progressBar = QProgressBar(self)
+        inputsLayout.addWidget(self.progressBar)
 
         # Results Display
         self.resultsLabel = QtWidgets.QLabel()
@@ -67,7 +74,7 @@ class CycleLifeTab(QtWidgets.QWidget):
         self.formulaWindow = QtWidgets.QTextEdit()
         self.formulaWindow.setReadOnly(True)
         self.formulaWindow.setFixedWidth(300)  # Set fixed width for formula window
-        self.formulaWindow.setText("Choose a graph type to see the formula.")
+        self.formulaWindow.setText("Choose a graph type and click Calculate to see the formula.")
         inputsLayout.addWidget(self.formulaWindow)
 
         mainLayout.addLayout(inputsLayout)
@@ -107,14 +114,10 @@ class CycleLifeTab(QtWidgets.QWidget):
         self.canvas.draw()
 
     def calculate(self):
-        # Validate the input fields
-        if not self.validate_inputs():
-            self.formulaWindow.setText("Please input all required fields.")
-            return
-
         graph_type = self.graphTypeDropdown.currentText()
-        self.figure.clf()  # Clear the entire figure
-        self.ax = self.figure.add_subplot(1, 1, 1)  # Add a new subplot
+        self.figure.clf()
+        self.ax = self.figure.add_subplot(1, 1, 1)
+        
         if graph_type == "Voltage/Cycles":
             self.calculate_voltage_cycles()
         elif graph_type == "Arrhenius Plot (Leakage Current/Temp)":
@@ -130,6 +133,14 @@ class CycleLifeTab(QtWidgets.QWidget):
         return all(input_field.text() for input_field in required_inputs)
 
     def calculate_voltage_cycles(self):
+        # Initialize formula to None
+        formula = None
+
+        # Validate the input fields
+        if not self.validate_inputs():
+            self.formulaWindow.setText("Please input all required fields.")
+            return
+
         # Retrieve the values from the input fields
         L0 = float(self.L0Input.text())
         T0 = float(self.T0Input.text())
@@ -143,8 +154,33 @@ class CycleLifeTab(QtWidgets.QWidget):
             formula = lambda x: L0 * 3.1 * ((T0 - Tx) / 10) * 1.58 * ((V0 - x) / .1)
         elif tech == "EDLC 2.7V":
             formula = lambda x: L0 * 3.25 * ((T0 - Tx) / 10) * 1.52 * ((V0 - x) / .1)
-        # Other formulas for different technologies
+        elif tech == "LiC 20-85 celsius":
+            formula = lambda x: L0 * 2.45 * ((T0 - Tx) / 10) * 1.58 * ((V0 - x) / .1)
+        elif tech == "LiC 20-70 celsius":
+            formula = lambda x: L0 * 2.42 * ((T0 - Tx) / 10) * 1.34 * ((V0 - x) / .1)
+        elif tech == "LCC":
+            formula = lambda x: L0 * 2 * ((T0 - Tx) / 10) * 2 * ((V0 - x) / .2)   
+            
+        # Check if formula is defined before using it
+        if formula is not None:
+            voltages = np.linspace(0, V0, 100)
+            cycles = [formula(v) for v in voltages]
 
+            self.ax.clear()
+            self.ax.plot(cycles, voltages)
+            self.ax.set_xlabel('Cycles')
+            self.ax.set_ylabel('Voltage (V)')
+            self.ax.ticklabel_format(style='plain', axis='both')
+            self.ax.set_xticklabels(self.ax.get_xticks(), rotation=90)
+            self.canvas.draw()
+            self.ax.set_xticklabels(self.ax.get_xticks(), rotation=90)
+
+            formula_text = self.get_formula_text(tech)
+            formula_text += f"\nL0 = {L0}, T0 = {T0}, Tx = {Tx}, V0 = {V0}, Vx = {Vx}"
+            self.formulaWindow.setText(formula_text)
+        else:
+            self.formulaWindow.setText("Formula is not defined. Please select a valid technology.")
+                        
         # Generate the graph data
         voltages = np.linspace(0, V0, 100)
         cycles = [formula(v) for v in voltages]
@@ -181,28 +217,53 @@ class CycleLifeTab(QtWidgets.QWidget):
         self.canvas.draw()
         self.formulaWindow.setText("Arrhenius Plot of Leakage Current over Temperature.")
         self.ax.set_xticklabels(self.ax.get_xticks(), rotation=90)  # Rotate x-axis labels
-
-    def calculate_log_log_plot(self):
-        # Using the given information about capacity loss
+        
+    def calculate_log_log_plot(self):    
+        I = float(self.IInput.text())  # Replace this with the actual input field
+    
+        # Calculate V1 and V2 based on V0
+        V1 = 0.8 * float(self.V0Input.text())
+        V2 = 0.4 * float(self.V0Input.text())
+    
+        # Assuming T1 and T2 are available (replace these with actual values)
+        T1 = float(self.L0Input.text())  # Starting time of test
+        T2 = float(self.T2Input.text())  # Assuming you have an input field for T2
+    
+        # Calculate capacitance using the formula
+        C = I * ((T2 - T1) / (V1 - V2))
+    
+        # Generate the log-log plot data
         time_months = np.logspace(0, 12, 100)  # Time in months
-        initial_capacity = 100  # Assuming an initial capacity of 100%
-        loss_rate = 5 / 3  # 5% loss over 3 months
-        capacity = initial_capacity - loss_rate * time_months
-        # Assuming a linear relationship between resistance and time
-        resistance = 1 + 0.01 * time_months
+        capacity = C * np.ones_like(time_months)  # Assuming constant capacitance
+        resistance = 1 + 0.01 * time_months  # Example resistance formula
+    
+        # Plotting the graph
         self.ax.clear()
-        self.ax.loglog(time_months, capacity, label='Capacitance (%)')
+        self.ax.loglog(time_months, capacity, label='Capacitance (F)')
         self.ax.set_xlabel('Time (Months)')
-        self.ax.set_ylabel('Capacitance (%)')
+        self.ax.set_ylabel('Capacitance (F)')
+    
         ax2 = self.ax.twinx()  # Create a second y-axis
         ax2.loglog(time_months, resistance, label='Resistance (Ohms)', color='orange')
         ax2.set_ylabel('Resistance (Ohms)')
+    
         # Custom formatting for tick labels
         self.ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: '{:.0f}'.format(x)))
         self.ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: '{:.0f}'.format(x)))
         ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: '{:.0f}'.format(x)))
+    
         self.ax.legend(loc='upper left')
         ax2.legend(loc='upper right')
+    
         self.canvas.draw()
-        self.formulaWindow.setText("Log/Log Plot of Capacitance and Resistance over Time in Months.")
-        self.ax.set_xticklabels(self.ax.get_xticks(), rotation=90)  # Rotate x-axis labels
+    
+        # Update the formula window
+        self.formulaWindow.setText(f"Capacitance (C) = {C} Farads")
+    
+        # Update the progress bar
+        num_steps = len(time_months)
+        for i in range(num_steps):
+            self.progressBar.setValue((i + 1) * 100 // num_steps)
+            QtWidgets.QApplication.processEvents()
+    
+        self.progressBar.setValue(0)
