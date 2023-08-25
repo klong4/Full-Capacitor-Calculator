@@ -111,3 +111,15 @@ def calculate_width(dimensions):
 
 def calculate_height(dimensions):
     return dimensions[1]
+
+#def LifeCycles
+#        if tech == "EDLC 3V":
+#            formula = lambda x: L0 * 3.1 * ((T0 - Tx) / 10) * 1.58 * ((V0 - Vx) / .1)
+#        elif tech == "EDLC 2.7V":
+#            formula = lambda x: L0 * 3.25 * ((T0 - Tx) / 10) * 1.52 * ((V0 - Vx) / .1)
+#        elif tech == "LiC 20-85 celsius":
+#            formula = lambda x: L0 * 2.45 * ((T0 - Tx) / 10) * 1.58 * ((V0 - Vx) / .1)
+#        elif tech == "LiC 20-70 celsius":
+#            formula = lambda x: L0 * 2.42 * ((T0 - Tx) / 10) * 1.34 * ((V0 - Vx) / .1)
+#        elif tech == "LCC":
+#            formula = lambda x: L0 * 2 * ((T0 - Tx) / 10) * 2 * ((V0 - x) / .2)
