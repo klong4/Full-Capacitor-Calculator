@@ -1,5 +1,4 @@
 from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QProgressBar
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -8,16 +7,15 @@ import numpy as np
 class CycleLifeTab(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
-        mainLayout = QtWidgets.QHBoxLayout()  # Main Horizontal layout
+        mainLayout = QtWidgets.QHBoxLayout()
 
         # Inputs and Button Layout
         inputsLayout = QtWidgets.QVBoxLayout()
-        inputsWidget = QtWidgets.QWidget()  # Create a widget to contain the layout
-        inputsWidget.setLayout(inputsLayout)  # Set the layout to the widget
-        inputsWidget.setFixedWidth(325)  # Set fixed width for the widget containing input fields
-        mainLayout.addWidget(inputsWidget)  # Add the widget to the main layout
+        inputsWidget = QtWidgets.QWidget()
+        inputsWidget.setLayout(inputsLayout)
+        inputsWidget.setFixedWidth(325)
+        mainLayout.addWidget(inputsWidget)
 
-        # Function to create input field with unit dropdown
         def create_input_field(label_text, tooltip, units):
             layout = QtWidgets.QHBoxLayout()
             input_field = QtWidgets.QLineEdit()
@@ -29,7 +27,6 @@ class CycleLifeTab(QtWidgets.QWidget):
             layout.addWidget(unit_dropdown)
             return layout, input_field, unit_dropdown
 
-        # Creating input fields
         layout, self.L0Input, _ = create_input_field("Guaranteed Life (L0):", "Guaranteed Life (L0): The guaranteed life of the capacitor at maximum operating temperature.", ["hours"])
         inputsLayout.addLayout(layout)
         layout, self.T0Input, _ = create_input_field("Maximum Operating Temperature (T0):", "Maximum Operating Temperature (T0): The maximum temperature that the capacitor can withstand.", ["°C"])
@@ -40,8 +37,6 @@ class CycleLifeTab(QtWidgets.QWidget):
         inputsLayout.addLayout(layout)
         layout, self.VxInput, _ = create_input_field("Working Voltage (Vx):", "Working Voltage (Vx): The voltage applied to the capacitor in the application.", ["V"])
         inputsLayout.addLayout(layout)
-        layout, self.IInput, _ = create_input_field("Discharge Current (I):", "Discharge Current (I): The current at which the capacitor is discharged.", ["A"])
-        inputsLayout.addLayout(layout)
 
         # Capacitor Technology Dropdown
         self.capacitorTechDropdown = QtWidgets.QComboBox()
@@ -50,21 +45,10 @@ class CycleLifeTab(QtWidgets.QWidget):
         inputsLayout.addWidget(QtWidgets.QLabel("Capacitor Technology:"))
         inputsLayout.addWidget(self.capacitorTechDropdown)
 
-        # Graph Type Dropdown
-        self.graphTypeDropdown = QtWidgets.QComboBox()
-        #self.graphTypeDropdown.addItems(["Voltage/Cycles", "Arrhenius Plot (Leakage Current/Temp)", "Log/Log Plot (Capacitance/Resistance over Time)"])
-        self.graphTypeDropdown.addItems(["Voltage/Cycles", "Log/Log Plot (Capacitance/Resistance over Time)"])
-        inputsLayout.addWidget(QtWidgets.QLabel("Graph Type:"))
-        inputsLayout.addWidget(self.graphTypeDropdown)
-
         # Calculate Button
         calculateButton = QtWidgets.QPushButton("Calculate")
         calculateButton.clicked.connect(self.calculate)
         inputsLayout.addWidget(calculateButton)
-        
-        # Add Progress Bar
-        self.progressBar = QProgressBar(self)
-        inputsLayout.addWidget(self.progressBar)
 
         # Results Display
         self.resultsLabel = QtWidgets.QLabel()
@@ -73,22 +57,22 @@ class CycleLifeTab(QtWidgets.QWidget):
         # Formula Display
         self.formulaWindow = QtWidgets.QTextEdit()
         self.formulaWindow.setReadOnly(True)
-        self.formulaWindow.setFixedWidth(300)  # Set fixed width for formula window
+        self.formulaWindow.setFixedWidth(300)
         self.formulaWindow.setText("Choose a graph type and click Calculate to see the formula.")
         inputsLayout.addWidget(self.formulaWindow)
 
         mainLayout.addLayout(inputsLayout)
 
         # Plot Layout
-        plotLayout = QtWidgets.QVBoxLayout()  # Plot vertical layout
+        plotLayout = QtWidgets.QVBoxLayout()
         self.figure, self.ax = plt.subplots()
         self.canvas = FigureCanvas(self.figure)
-        self.figure.tight_layout()  # Set tight layout by default
+        self.figure.tight_layout()
 
         # Adding Custom Navigation Toolbar
         self.toolbar = NavigationToolbar(self.canvas, self)
-        plotLayout.addWidget(self.toolbar)  # Add toolbar first
-        plotLayout.addWidget(self.canvas)   # Then add canvas
+        plotLayout.addWidget(self.toolbar)
+        plotLayout.addWidget(self.canvas)
 
         mainLayout.addLayout(plotLayout)
 
@@ -109,21 +93,12 @@ class CycleLifeTab(QtWidgets.QWidget):
         }
         return f"{tech} Formula:\n{formulas[tech]}"
 
-    def reset_graph(self):
-        self.ax.clear()
-        self.canvas.draw()
-
     def calculate(self):
-        graph_type = self.graphTypeDropdown.currentText()
         self.figure.clf()
         self.ax = self.figure.add_subplot(1, 1, 1)
-        
-        if graph_type == "Voltage/Cycles":
-            self.calculate_voltage_cycles()
-        elif graph_type == "Arrhenius Plot (Leakage Current/Temp)":
-            self.calculate_arrhenius_plot()
-        elif graph_type == "Log/Log Plot (Capacitance/Resistance over Time)":
-            self.calculate_log_log_plot()
+    
+        self.calculate_voltage_cycles()
+    
         self.figure.tight_layout()  # Apply tight layout
         self.canvas.draw()  # Redraw the canvas after calculating
 
@@ -199,71 +174,3 @@ class CycleLifeTab(QtWidgets.QWidget):
         formula_text = self.get_formula_text(tech)
         formula_text += f"\nL0 = {L0}, T0 = {T0}, Tx = {Tx}, V0 = {V0}, Vx = {Vx}"
         self.formulaWindow.setText(formula_text)
-
-    def calculate_arrhenius_plot(self):
-        # Example code for Arrhenius Plot (using a simple exponential decay model)
-        temperatures = np.linspace(0, 100, 100)
-        # Assuming a base leakage current and an activation energy
-        base_leakage_current = 1e-6
-        activation_energy = 0.5
-        k_boltzmann = 8.617e-5  # Boltzmann constant, in eV/K
-        leakage_currents = base_leakage_current * np.exp(-activation_energy / (k_boltzmann * (temperatures + 273)))
-        self.ax.clear()
-        self.ax.plot(temperatures, leakage_currents)
-        self.ax.set_xlabel('Temperature (°C)')
-        self.ax.set_ylabel('Leakage Current (A)')
-        self.ax.ticklabel_format(style='plain', axis='both')  # Avoid scientific notation
-        self.ax.set_xticklabels(self.ax.get_xticks(), rotation=90)  # Vertical x-axis labels
-        self.canvas.draw()
-        self.formulaWindow.setText("Arrhenius Plot of Leakage Current over Temperature.")
-        self.ax.set_xticklabels(self.ax.get_xticks(), rotation=90)  # Rotate x-axis labels
-        
-    def calculate_log_log_plot(self):    
-        I = float(self.IInput.text())  # Replace this with the actual input field
-    
-        # Calculate V1 and V2 based on V0
-        V1 = 0.8 * float(self.V0Input.text())
-        V2 = 0.4 * float(self.V0Input.text())
-    
-        # Assuming T1 and T2 are available (replace these with actual values)
-        T1 = float(self.L0Input.text())  # Starting time of test
-        T2 = float(self.T2Input.text())  # Assuming you have an input field for T2
-    
-        # Calculate capacitance using the formula
-        C = I * ((T2 - T1) / (V1 - V2))
-    
-        # Generate the log-log plot data
-        time_months = np.logspace(0, 12, 100)  # Time in months
-        capacity = C * np.ones_like(time_months)  # Assuming constant capacitance
-        resistance = 1 + 0.01 * time_months  # Example resistance formula
-    
-        # Plotting the graph
-        self.ax.clear()
-        self.ax.loglog(time_months, capacity, label='Capacitance (F)')
-        self.ax.set_xlabel('Time (Months)')
-        self.ax.set_ylabel('Capacitance (F)')
-    
-        ax2 = self.ax.twinx()  # Create a second y-axis
-        ax2.loglog(time_months, resistance, label='Resistance (Ohms)', color='orange')
-        ax2.set_ylabel('Resistance (Ohms)')
-    
-        # Custom formatting for tick labels
-        self.ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: '{:.0f}'.format(x)))
-        self.ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: '{:.0f}'.format(x)))
-        ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: '{:.0f}'.format(x)))
-    
-        self.ax.legend(loc='upper left')
-        ax2.legend(loc='upper right')
-    
-        self.canvas.draw()
-    
-        # Update the formula window
-        self.formulaWindow.setText(f"Capacitance (C) = {C} Farads")
-    
-        # Update the progress bar
-        num_steps = len(time_months)
-        for i in range(num_steps):
-            self.progressBar.setValue((i + 1) * 100 // num_steps)
-            QtWidgets.QApplication.processEvents()
-    
-        self.progressBar.setValue(0)

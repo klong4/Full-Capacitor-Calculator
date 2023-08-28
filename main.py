@@ -21,6 +21,10 @@ dark_theme = """
     QLineEdit, QSpinBox, QComboBox, QTextEdit {
         background-color: #454545;
         color: #E0E0E0;
+        border: 1px solid #555555;
+    }
+    QLineEdit:focus, QSpinBox:focus, QComboBox:focus, QTextEdit:focus {
+        border: 1px solid #FF4500;
     }
     QLabel {
         color: #E0E0E0;
@@ -28,9 +32,14 @@ dark_theme = """
     QPushButton {
         background-color: #555555;
         color: #E0E0E0;
+        border: 1px solid #555555;
     }
     QPushButton:hover {
         background-color: #666666;
+    }
+    QPushButton:pressed {
+        background-color: #FF4500;
+        color: #E0E0E0;
     }
     QTabWidget::pane {
         border: 1px solid #444444;
@@ -39,7 +48,7 @@ dark_theme = """
         background: #555555;
     }
     QTabBar::tab:selected {
-        background: #888888;
+        background: #FF4500;
     }
 """
 
