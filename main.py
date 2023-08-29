@@ -12,6 +12,8 @@ from tabs.mixed_circuits import MixedCircuitsTab
 from tabs.multiple_values import MultipleValuesTab
 from tabs.balancing_resistor import BalancingResistorTab
 from tabs.cycle_life import CycleLifeTab
+from tabs.life_cycles_dod import LifeCyclesDODTAB
+
 
 dark_theme = """
     QWidget {
@@ -63,11 +65,13 @@ class MainWindow(QtWidgets.QMainWindow):
         # Add tabs for each section
         self.tabs.addTab(BasicParametersTab(), "Basic Parameters")
         self.tabs.addTab(ChargingDischargingTab(), "Charging/Discharging")
+        self.tabs.addTab(CycleLifeTab(), "Cycle Life")
+        self.tabs.addTab(LifeCyclesDODTAB(), "Depth Of Discharge Life Cycles")
+
         #self.tabs.addTab(SeriesCircuitsTab(), "Series Circuits")
         #self.tabs.addTab(ParallelCircuitsTab(), "Parallel Circuits")
         #self.tabs.addTab(MixedCircuitsTab(), "Mixed Circuits")
         #self.tabs.addTab(BalancingResistorTab(), "Passive Balancing")
-        self.tabs.addTab(CycleLifeTab(), "Cycle Life")
         #self.tabs.addTab(PerformanceMetricsTab(), "Performance Metrics")
         #self.tabs.addTab(ThermalConsiderationsTab(), "Thermal Considerations")
         #self.tabs.addTab(LifetimeReliabilityTab(), "Lifetime & Reliability")
