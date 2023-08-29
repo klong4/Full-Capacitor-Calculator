@@ -13,6 +13,7 @@ from tabs.multiple_values import MultipleValuesTab
 from tabs.balancing_resistor import BalancingResistorTab
 from tabs.cycle_life import CycleLifeTab
 from tabs.life_cycles_dod import LifeCyclesDODTAB
+from tabs.curve_fitting_module import CurveFittingApp  # Import the CurveFittingApp class
 
 
 dark_theme = """
@@ -67,7 +68,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tabs.addTab(ChargingDischargingTab(), "Charging/Discharging")
         self.tabs.addTab(CycleLifeTab(), "Cycle Life")
         self.tabs.addTab(LifeCyclesDODTAB(), "Depth Of Discharge Life Cycles")
-
+        self.tabs.addTab(CurveFittingApp(), "CurveFittingApp")
         #self.tabs.addTab(SeriesCircuitsTab(), "Series Circuits")
         #self.tabs.addTab(ParallelCircuitsTab(), "Parallel Circuits")
         #self.tabs.addTab(MixedCircuitsTab(), "Mixed Circuits")

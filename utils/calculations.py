@@ -123,3 +123,121 @@ def calculate_height(dimensions):
 #            formula = lambda x: L0 * 2.42 * ((T0 - Tx) / 10) * 1.34 * ((V0 - Vx) / .1)
 #        elif tech == "LCC":
 #            formula = lambda x: L0 * 2 * ((T0 - Tx) / 10) * 2 * ((V0 - x) / .2)
+# Define curve types
+def linear(x, a, b):
+    return a * x + b
+
+def quadratic(x, a, b, c):
+    return a * x**2 + b * x + c
+
+def sine_wave(x, A, omega, phi):
+    return A * np.sin(omega * x + phi)
+
+def exponential(x, a, b):
+    return a * np.exp(b * x)
+
+def logarithmic(x, a, b):
+    return a + b * np.log(x)
+
+def cubic(x, a, b, c, d):
+    return a * x**3 + b * x**2 + c * x + d
+
+def power_law(x, a, b):
+    return a * x ** b
+
+def gaussian(x, a, b, c):
+    return a * np.exp(-((x - b)**2) / (2 * c**2))
+
+def logistic(x, a, b, c):
+    return a / (1 + np.exp(-b * (x - c)))
+
+def hyperbolic(x, a, b):
+    return a / (b + x)
+
+def cosine_wave(x, A, omega, phi):
+    return A * np.cos(omega * x + phi)
+
+def tangent(x, a, b):
+    return a * np.tan(b * x)
+
+def square_root(x, a, b):
+    return a * np.sqrt(x) + b
+
+def exponential_decay(x, a, b):
+    return a * np.exp(-b * x)
+
+def logarithmic_decay(x, a, b):
+    return a - b * np.log(x)
+
+def polynomial_4th_degree(x, a, b, c, d, e):
+    return a * x**4 + b * x**3 + c * x**2 + d * x + e
+
+def inverse_square(x, a):
+    return a / (x ** 2)
+
+def sigmoid(x, a, b):
+    return 1 / (1 + np.exp(-a * (x - b)))
+
+# Define initial guesses and bounds for each curve type
+initial_guesses = {
+    'Linear': [1, 1],
+    'Quadratic': [1, 1, 1],
+    'Sine Wave': [1, 1, 0],
+    'Exponential': [1, 1],
+    'Logarithmic': [1, 1],
+    'Cubic': [1, 1, 1, 1],
+    'Power Law': [1, 1],
+    'Gaussian': [1, 0, 1],
+    'Logistic': [1, 1, 1],
+    'Hyperbolic': [1, 1],
+    'Cosine Wave': [1, 1, 0],
+    'Tangent': [1, 1],
+    'Square Root': [1, 1],
+    'Exponential Decay': [1, 1],
+    'Logarithmic Decay': [1, 1],
+    'Polynomial (4th degree)': [1, 1, 1, 1, 1],
+    'Inverse Square': [1],
+    'Sigmoid': [1, 1]
+}
+
+bounds = {
+    'Linear': ([-np.inf, -np.inf], [np.inf, np.inf]),
+    'Quadratic': ([-np.inf, -np.inf, -np.inf], [np.inf, np.inf, np.inf]),
+    'Sine Wave': ([-np.inf, -np.inf, -np.inf], [np.inf, np.inf, np.inf]),
+    'Exponential': ([0, 0], [np.inf, np.inf]),
+    'Logarithmic': ([-np.inf, 0], [np.inf, np.inf]),
+    'Cubic': ([-np.inf, -np.inf, -np.inf, -np.inf], [np.inf, np.inf, np.inf, np.inf]),
+    'Power Law': ([0, 0], [np.inf, np.inf]),
+    'Gaussian': ([-np.inf, -np.inf, 0], [np.inf, np.inf, np.inf]),
+    'Logistic': ([-np.inf, -np.inf, -np.inf], [np.inf, np.inf, np.inf]),
+    'Hyperbolic': ([-np.inf, -np.inf], [np.inf, np.inf]),
+    'Cosine Wave': ([-np.inf, -np.inf, -np.inf], [np.inf, np.inf, np.inf]),
+    'Tangent': ([-np.inf, -np.inf], [np.inf, np.inf]),
+    'Square Root': ([0, -np.inf], [np.inf, np.inf]),
+    'Exponential Decay': ([0, 0], [np.inf, np.inf]),
+    'Logarithmic Decay': ([-np.inf, 0], [np.inf, np.inf]),
+    'Polynomial (4th degree)': ([-np.inf, -np.inf, -np.inf, -np.inf, -np.inf], [np.inf, np.inf, np.inf, np.inf, np.inf]),
+    'Inverse Square': ([0], [np.inf]),
+    'Sigmoid': ([-np.inf, -np.inf], [np.inf, np.inf])
+}
+
+curve_types = {
+    'Linear': linear,
+    'Quadratic': quadratic,
+    'Sine Wave': sine_wave,
+    'Exponential': exponential,
+    'Logarithmic': logarithmic,
+    'Cubic': cubic,
+    'Power Law': power_law,
+    'Gaussian': gaussian,
+    'Logistic': logistic,
+    'Hyperbolic': hyperbolic,
+    'Cosine Wave': cosine_wave,
+    'Tangent': tangent,
+    'Square Root': square_root,
+    'Exponential Decay': exponential_decay,
+    'Logarithmic Decay': logarithmic_decay,
+    'Polynomial (4th degree)': polynomial_4th_degree,
+    'Inverse Square': inverse_square,
+    'Sigmoid': sigmoid
+}
