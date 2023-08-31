@@ -1,3 +1,4 @@
+# main.py
 from PyQt5 import QtWidgets
 from tabs.basic_parameters import BasicParametersTab
 from tabs.charging_discharging import ChargingDischargingTab

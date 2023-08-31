@@ -1,35 +1,61 @@
+# Curve Fitting Module
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
-from PyQt5 import QtWidgets
+from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QVBoxLayout, QComboBox
+from PyQt5.QtCore import Qt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 import pandas as pd
 from scipy.optimize import curve_fit
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, mean_squared_error
 from numpy.polynomial.polynomial import Polynomial
 from matplotlib.lines import Line2D
+from scipy.interpolate import interp1d, CubicSpline
+from sklearn.model_selection import ParameterGrid
+from scipy.stats.mstats import winsorize, gmean, hmean
+from scipy.stats import mode, trim_mean
+from PyQt5 import QtWidgets
+from utils.mapping import curve_types, initial_guesses, bounds
+from utils.calculate_relationship import calculate_relationship
+from utils.calculations import calculate_rms
+from PyQt5.QtWidgets import QFileDialog
 
 
-# Define curve types, initial guesses, and bounds (imported from utils.calculations)
-from utils.calculations import curve_types, initial_guesses, bounds
+class CurveFittingApp(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(CurveFittingApp, self).__init__(*args, **kwargs)
 
-class CurveFittingApp(QtWidgets.QMainWindow):
-    def __init__(self):
-        super().__init__()
+        self.figure, self.ax = plt.subplots()  # Initialize figure and axes
+        self.canvas = FigureCanvas(self.figure)
+        self.calculate_relationship = calculate_relationship
 
-        self.x_data = np.linspace(0, 10, 100)  # Example x_data
-        self.best_fits = {}  # Example best_fits (to be populated later)
-        self.ax = None  # Will be set in createWidgets()
+        # Initialize x_data, best_fits, and y_data_sets
+        self.x_data = np.array([])  # Initialize as empty array
+        self.best_fits = {}  # Initialize as empty dictionary
+        self.y_data_sets = {}  # Initialize as empty dictionary
+        self.data_loaded = False  # Flag to check if data is loaded
 
+        # Initialize the UI
         self.initUI()
+
+    def on_pick(self, event):
+        # Your code to handle the pick event
+        print("Pick event detected!")
+
+    def update_plot(self):
+        # Your code to update the plot
+        print("Updating plot!")
+
+    def my_function(self, x, a, b, c):
+        return a * np.exp(-b * x) + c
 
     def initUI(self):
         self.setWindowTitle("Combined Curve Fitting App")
         self.setGeometry(100, 100, 800, 600)
         self.createWidgets()
         self.createLayout()
-
+    
     def createWidgets(self):
         self.figure, self.ax = plt.subplots()
         self.canvas = FigureCanvas(self.figure)
@@ -37,293 +63,174 @@ class CurveFittingApp(QtWidgets.QMainWindow):
         self.toolbar = NavigationToolbar(self.canvas, self)
         self.resultsWindow = QtWidgets.QTextEdit()
         self.resultsWindow.setReadOnly(True)
-        self.dataSetDropdown = QtWidgets.QComboBox()
+        self.dataSetDropdown = QtWidgets.QComboBox()  # Add QtWidgets. before QComboBox
         self.dataSetDropdown.currentIndexChanged.connect(self.update_plot)
         self.loadButton = QtWidgets.QPushButton("Load CSV", clicked=self.load_csv)
         self.fitButton = QtWidgets.QPushButton("Fit Curve", clicked=self.fit_curve)
         self.calculateButton = QtWidgets.QPushButton("Calculate Relationship", clicked=self.calculate_relationship)
 
     def createLayout(self):
-        mainLayout = QtWidgets.QVBoxLayout()
+        mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.toolbar)
         mainLayout.addWidget(self.canvas)
         mainLayout.addWidget(self.dataSetDropdown)
         mainLayout.addWidget(self.loadButton)
         mainLayout.addWidget(self.fitButton)
-        mainLayout.addWidget(self.calculateButton)
         mainLayout.addWidget(self.resultsWindow)
-
-        centralWidget = QtWidgets.QWidget()
-        centralWidget.setLayout(mainLayout)
-        self.setCentralWidget(centralWidget)
+        self.setLayout(mainLayout)
 
     def load_csv(self):
-        options = QtWidgets.QFileDialog.Options()
-        filePath, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Open CSV File", "", "CSV Files (*.csv)", options=options)
-    
-        if filePath:
-            df = pd.read_csv(filePath)
-            self.x_data = df.iloc[:, 0].tolist()  # Update x_data with the first column of the CSV
-            self.y_data_sets = df.iloc[:, 1:].to_dict(orient='list')
-            self.dataSetDropdown.clear()
-            self.dataSetDropdown.addItems(list(self.y_data_sets.keys()))
+        options = QFileDialog.Options()
+        options |= QFileDialog.ReadOnly
+        csv_path, _ = QFileDialog.getOpenFileName(self, "Open CSV File", "", "CSV Files (*.csv);;All Files (*)", options=options)
 
-    def update_plot(self):
-        self.ax.clear()
-        for i, (name, y_data) in enumerate(self.y_data_sets.items()):
-            line, = self.ax.plot(self.x_data, y_data, marker='o', linestyle='', picker=5, label=name)
-            line.set_color(plt.cm.jet(i / len(self.y_data_sets)))
-        self.canvas.draw()
+        if csv_path:
+            try:
+                df = pd.read_csv(csv_path, header=None)
+                self.x_data = df.iloc[:, 0].values  # First column as x-data
+            
+                self.y_data_sets = {}  # Reset the existing y_data_sets
+            
+                for idx, col in enumerate(df.columns[1:]):  # Loop through all columns other than the first one
+                    curve_name = f"Curve {idx + 1}"  # Generate a curve name
+                    self.y_data_sets[curve_name] = df[col].values  # Each subsequent column as a different y-dataset
+            
+                self.data_loaded = True
+                print("CSV loaded successfully.")
+            
+                # Update the dropdown for selecting y-datasets
+                self.dataSetDropdown.clear()
+                self.dataSetDropdown.addItems(list(self.y_data_sets.keys()))
+            
+            except Exception as e:
+                print(f"Error in loading CSV: {e}")
+                self.data_loaded = False
+        else:
+            print("No file selected.")
 
     def fit_curve(self):
-        name = "Sample Data"  # Replace with the actual name you want to use for the data
+        if not self.data_loaded:
+            print("Data not loaded. Cannot fit.")
+            return
+    try:
+        # Define the curve function you're trying to fit
+        def my_function(x, a, b, c):
+            return a * np.exp(-b * x) + c
+
+        # Perform curve fitting
+        params, params_covariance = curve_fit(my_function, self.x_data, self.y_data)
+
+        # Print the covariance of parameters
+        print("Covariance of parameters: ", params_covariance)
+
+        # Calculate R-squared value to evaluate the fit
+        residuals = self.y_data - my_function(self.x_data, *params)
+        ss_res = np.sum(residuals**2)
+        ss_tot = np.sum((self.y_data - np.mean(self.y_data))**2)
+        r2 = 1 - (ss_res / ss_tot)
+
+        # Use calculate_rms to get the root mean square of the residuals
+        rms_value = self.calculate_rms(residuals)
+        
+        print(f"Fit successful. R^2 value is {r2}")
+        print(f"Root Mean Square of residuals: {rms_value}")
+
+    except Exception as e:
+        print(f"An error occurred while fitting the curve: {e}")
+        
+    def update_plot(self):
+        print("Updating plot...")
+
+        # Debug: Print out data to ensure it's loaded
+        print(f"x_data: {self.x_data}")
+        print(f"y_data_sets: {self.y_data_sets}")
+
+        self.ax.clear()  # Clear previous plot
+
+        # Check if data is loaded, skip if not
+        if not self.data_loaded:
+            print("Data not loaded, skipping plot update.")
+            return
 
         try:
-            print(f"Trying to fit curves for {name}...")
+            for i, (name, y_data) in enumerate(self.y_data_sets.items()):
+                self.ax.plot(self.x_data, y_data, marker='o', linestyle='', label=name)
+                print(f"Plotted {name}")
 
-            self.best_fits = {}  # Reset best fits
-            for i, y_data in enumerate(self.y_data_sets.values()):
-                best_r2 = -1
-                best_fit = None
-                best_params = None
+            self.ax.set_yscale('log')  # Set y-axis to log scale, if applicable
+            self.ax.set_xscale('log')  # Set x-axis to log scale, if applicable
 
-                for curve_name, func in curve_types.items():
-                    try:
-                        initial_guess = initial_guesses[curve_name]
-                        bound = bounds[curve_name]
-
-                        params, _ = curve_fit(func, np.array(self.x_data), np.array(y_data), p0=initial_guess, bounds=bound)
-                        y_pred = func(np.array(self.x_data), *params)
-                        r2 = r2_score(y_data, y_pred)
-
-                        if r2 > best_r2:
-                            best_r2 = r2
-                            best_fit = curve_name
-                            best_params = params
-                    except Exception as e:
-                        print(f"Failed to fit {curve_name} for {name}: {e}")
-
-                if best_fit:
-                    self.best_fits[name] = {'fit': best_fit, 'params': best_params, 'r2': best_r2}
-                    func = curve_types[best_fit]
-                    y_pred = func(np.array(self.x_data), *best_params)
-                    line, = self.ax.plot(self.x_data, y_pred, picker=5, label=f"{name} ({best_fit})")
-                    line.set_color(plt.cm.jet(i / len(self.y_data_sets)))
-
-            self.ax.legend(loc='upper right').set_draggable(True)  # Make the legend draggable
+            self.ax.legend(loc='upper right')
             self.canvas.draw()
-
-            results_text = "\n".join([f"{name}: {fit['fit']}" for name, fit in self.best_fits.items()])
-            self.resultsWindow.setText(f"Best Fits:\n{results_text}")
-
         except Exception as e:
-            print(f"Failed to fit curves for {name}: {e}")    
-    
-def calculate_relationship(self):
-    name = "Sample Data"
-        
-    final_y_avg = np.zeros_like(self.x_data)
-    all_params = np.array([info['params'] for info in self.best_fits.values()])
+            print(f"Error in updating plot: {e}")
 
-    for name, info in self.best_fits.items():
-        best_fit = info['fit']
-        best_params = info['params']
-        func = curve_types[best_fit]
-        final_y_avg += func(np.array(self.x_data), *best_params)
-    final_y_avg /= len(self.best_fits)
+        print("Plot update complete.")
 
-    median_values = np.zeros_like(self.x_data)
-    median_params = np.median(all_params, axis=0)
-    
-    for i, x in enumerate(self.x_data):
-        median_value = 0
-        for curve_name, func in curve_types.items():
-            params = median_params
-            try:
-                median_value += func(np.array([x]), *params)
-            except Exception as e:
-                print(f"Failed to calculate median for {curve_name}: {e}")
-        median_values[i] = median_value / len(curve_types)
+# Define dynamic_initial_guess and other utility methods here
+def dynamic_initial_guess(self, x_data, y_data):
+    # ... (Your dynamic initial guess logic here)
+    return None  # Placeholder, replace with your logic
 
-    # Rest of the code...
+def on_pick(self, event):
+    if isinstance(event.artist, Line2D):
+        picked_line = event.artist
+        label = picked_line.get_label()
 
-
-        # Approach 2: Weighted Average Based on R^2 Value
-        final_y_weighted = np.zeros_like(self.x_data)
-        total_weight = 0
-        for name, info in self.best_fits.items():
-            best_fit = info['fit']
-            best_params = info['params']
-            r2 = info['r2']
-            func = curve_types[best_fit]
-            final_y_weighted += r2 * func(np.array(self.x_data), *best_params)
-            total_weight += r2
-        final_y_weighted /= total_weight
-
-        # Approach 3: Polynomial Regression on Best Fits
-        p = Polynomial.fit(self.x_data, final_y_avg, 4)
-        final_y_poly = p(np.array(self.x_data))
-
-        # Approach 4: Complex Mathematical Operations
-        final_y_complex = np.ones_like(self.x_data)
-        for name, info in self.best_fits.items():
-            best_fit = info['fit']
-            best_params = info['params']
-            func = curve_types[best_fit]
-            final_y_complex *= func(np.array(self.x_data), *best_params)
-        final_y_complex = np.sqrt(final_y_complex)
-
-        # Approach 5: Geometric Mean
-        geometric_mean = np.ones_like(self.x_data)
-        for name, info in self.best_fits.items():
-            best_fit = info['fit']
-            best_params = info['params']
-            func = curve_types[best_fit]
-            geometric_mean *= func(np.array(self.x_data), *best_params)
-        geometric_mean = np.power(geometric_mean, 1 / len(self.best_fits))
-
-        # Approach 6: Harmonic Mean
-        harmonic_mean = np.zeros_like(self.x_data)
-        for name, info in self.best_fits.items():
-            best_fit = info['fit']
-            best_params = info['params']
-            func = curve_types[best_fit]
-            harmonic_mean += 1 / func(np.array(self.x_data), *best_params)
-        harmonic_mean = len(self.best_fits) / harmonic_mean
-
-        # Approach 7: Median
-        median_values = np.median(np.array([info['params'] for info in self.best_fits.values()]), axis=0)
-
-        # Approach 8: Mode (Not a typical approach for continuous data)
-        mode_values = stats.mode(np.array([info['params'] for info in self.best_fits.values()]), axis=0)[0][0]
-
-        # Approach 9: Exponential Weighted Moving Average (EWMA)
-        alpha = 0.2
-        ewma = np.zeros_like(self.x_data)
-        for name, info in self.best_fits.items():
-            best_fit = info['fit']
-            best_params = info['params']
-            func = curve_types[best_fit]
-            y_values = func(np.array(self.x_data), *best_params)
-            ewma = alpha * y_values + (1 - alpha) * ewma
-
-        # Approach 10: Root Mean Square (RMS)
-        rms = np.zeros_like(self.x_data)
-        for name, info in self.best_fits.items():
-            best_fit = info['fit']
-            best_params = info['params']
-            func = curve_types[best_fit]
-            y_values = func(np.array(self.x_data), *best_params)
-            rms += y_values ** 2
-        rms = np.sqrt(rms / len(self.best_fits))
-
-        # Approach 11: Logarithmic Mean
-        log_mean = np.zeros_like(self.x_data)
-        for name, info in self.best_fits.items():
-            best_fit = info['fit']
-            best_params = info['params']
-            func = curve_types[best_fit]
-            y_values = func(np.array(self.x_data), *best_params)
-            log_mean += np.log(y_values)
-        log_mean = np.exp(log_mean / len(self.best_fits))
-
-        # Approach 12: Trimmed Mean (Trim 10% from each end)
-        trimmed_mean_list = []
-        for name, info in self.best_fits.items():
-            best_fit = info['fit']
-            best_params = info['params']
-            func = curve_types[best_fit]
-            y_values = func(np.array(self.x_data), *best_params)
-            trimmed_mean_list.append(y_values)
-        trimmed_mean = stats.trim_mean(np.array(trimmed_mean_list), 0.1, axis=0)
-
-        # Approach 13: Winsorized Mean (Winsorize 5% from each end)
-        winsorized_mean_list = []
-        for name, info in self.best_fits.items():
-            best_fit = info['fit']
-            best_params = info['params']
-            func = curve_types[best_fit]
-            y_values = func(np.array(self.x_data), *best_params)
-            winsorized_mean_list.append(y_values)
-        winsorized_mean = stats.mstats.winsorize(np.array(winsorized_mean_list), limits=[0.05, 0.05])
-
-        # Plotting all the relationship lines with unique identifiers and make them pickable
-        line1, = self.ax.plot(self.x_data, final_y_avg, 'r--', label='Simple Average', gid='relationship_line', picker=5)
-        line2, = self.ax.plot(self.x_data, final_y_weighted, 'g-.', label='Weighted Average', gid='relationship_line', picker=5)
-        line3, = self.ax.plot(self.x_data, final_y_poly, 'b:', label='Polynomial Regression', gid='relationship_line', picker=5)
-        line4, = self.ax.plot(self.x_data, final_y_complex, 'm-', label='Complex Operations', gid='relationship_line', picker=5)
-        line5, = self.ax.plot(self.x_data, geometric_mean, 'c--', label='Geometric Mean', gid='relationship_line', picker=5)
-        line6, = self.ax.plot(self.x_data, harmonic_mean, 'y-.', label='Harmonic Mean', gid='relationship_line', picker=5)
-        line7, = self.ax.plot(self.x_data, median_values, 'k:', label='Median', gid='relationship_line', picker=5)
-        line8, = self.ax.plot(self.x_data, mode_values, 'g--', label='Mode', gid='relationship_line', picker=5)
-        line9, = self.ax.plot(self.x_data, ewma, 'b-.', label='EWMA', gid='relationship_line', picker=5)
-        line10, = self.ax.plot(self.x_data, rms, 'm:', label='RMS', gid='relationship_line', picker=5)
-        line11, = self.ax.plot(self.x_data, log_mean, 'r--', label='Log Mean', gid='relationship_line', picker=5)
-        line12, = self.ax.plot(self.x_data, trimmed_mean, 'g-.', label='Trimmed Mean', gid='relationship_line', picker=5)
-        line13, = self.ax.plot(self.x_data, winsorized_mean, 'b:', label='Winsorized Mean', gid='relationship_line', picker=5)
-
-        # Update the plot and results window
-        self.ax.legend(loc='upper right').set_draggable(True)  # Make the legend draggable
+        picked_line.set_linewidth(3)
+        self.ax.legend(loc='upper right').set_draggable(True)
         self.canvas.draw()
-        
-        # Define equations dictionary for storing equations for each approach
-        equations = {}
 
-        # Update the results window with equations for each approach
-        equations['Simple Average'] = 'y = (1/n) * Σ f_i(x)'
-        equations['Weighted Average'] = 'y = (1/Σ R^2) * Σ (R^2 * f_i(x))'
-        equations['Polynomial Regression'] = f'Polynomial: {p}'
-        equations['Complex Operations'] = 'y = sqrt(Π f_i(x))'
-        equations['Geometric Mean'] = 'y = √(Π f_i(x))'
-        equations['Harmonic Mean'] = 'y = n / Σ (1 / f_i(x))'
-        equations['Median'] = 'y = median(f_i(x))'
-        equations['Mode'] = 'y = mode(f_i(x))'
-        equations['EWMA'] = f'y[n] = α * f_i(x)[n] + (1 - α) * y[n-1]'
-        equations['RMS'] = 'y = √(Σ f_i(x)^2 / n)'
-        equations['Log Mean'] = 'y = exp(Σ ln(f_i(x)) / n)'
-        equations['Trimmed Mean'] = 'y = trimmed_mean(f_i(x))'
-        equations['Winsorized Mean'] = 'y = winsorized_mean(f_i(x))'
+        if label in self.best_fits:
+            best_fit_info = self.best_fits[label]
+            best_fit = best_fit_info['fit']
+            best_params = best_fit_info['params']
+            r2 = best_fit_info['r2']
 
-        results_text = "\n".join([f"{approach}: {eq}" for approach, eq in equations.items()])
-        self.resultsWindow.setText(f"Equations for Each Approach:\n{results_text}")
-
-    def on_pick(self, event):
-        if isinstance(event.artist, Line2D):
-            picked_line = event.artist
-            label = picked_line.get_label()
-
-            # Highlight the picked line
-            picked_line.set_linewidth(3)
-            self.ax.legend(loc='upper right').set_draggable(True)
-            self.canvas.draw()
-
-            # Access best fit information for the picked line
-            if label in self.best_fits:
-                best_fit_info = self.best_fits[label]
-                best_fit = best_fit_info['fit']
-                best_params = best_fit_info['params']
-                r2 = best_fit_info['r2']
-
-                # Example: Print detailed information about the best fit
-                print(f"Selected Line: {label}")
-                print(f"Best Fit: {best_fit}")
-                print(f"Best Fit Parameters: {best_params}")
-                print(f"R-squared Value: {r2}")
-
-                # Perform more advanced actions based on the picked line
-                # For example, you could update a separate results area with the selected line's details
+            print(f"Selected Line: {label}")
+            print(f"Best Fit: {best_fit}")
+            print(f"Best Fit Parameters: {best_params}")
+            print(f"R-squared Value: {r2}")
 
         else:
             print("Pick event detected, but not on a Line2D object")
 
-    # Reset the linewidth of all lines (unhighlight all lines except the picked one)
-    for line in self.ax.lines:
-        line.set_linewidth(1)
-    self.ax.legend(loc='upper right').set_draggable(True)
-    self.canvas.draw()
+        for line in self.ax.lines:
+            line.set_linewidth(1)
+        self.ax.legend(loc='upper right').set_draggable(True)
+        self.canvas.draw()
+
+# Your additional methods (e.g., fit_data, calculate_rms, etc.)
+def fit_data(self):
+    if not self.data_loaded:
+        print("Data not loaded. Cannot fit.")
+        return
+        
+    # Assuming that self.x_data and self.y_data are loaded
+    try:
+        # Define the curve function you're trying to fit
+        def my_function(x, a, b, c):
+            return a * np.exp(-b * x) + c
+            
+        params, params_covariance = curve_fit(my_function, self.x_data, self.y_data)
+            
+        # Calculate R-squared value to evaluate the fit
+        residuals = self.y_data - my_function(self.x_data, *params)
+        ss_res = np.sum(residuals**2)
+        ss_tot = np.sum((self.y_data - np.mean(self.y_data))**2)
+        r2 = 1 - (ss_res / ss_tot)
+            
+        print(f"Fit successful. R^2 value is {r2}")
+            
+    except Exception as e:
+        print(f"An error occurred while fitting the data: {e}")
+    
+def calculate_rms(self, array):
+    """Calculate the root mean square of the given array."""
+    return math.sqrt(mean_squared_error(array, np.zeros_like(array)))
 
 if __name__ == "__main__":
-    app = QtWidgets.QApplication([])
+    app = QApplication([])
     window = CurveFittingApp()
     window.show()
     app.exec_()
