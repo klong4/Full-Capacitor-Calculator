@@ -1,4 +1,3 @@
-from curses import window  # Not used in this code snippet
 import sys
 import numpy as np
 from scipy.stats import mode, trim_mean, gmean, hmean
